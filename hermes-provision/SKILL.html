@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="description" content="Deploy Hermes Agent (Nous Research) on a Hetzner / Ubuntu VPS. Combines OnlyTerp bootstrap (bare-metal Hermes) with a Camofox-VNC Docker container for browser automation, then wires Discord and OAuth-based providers (ChatGPT subscription via openai-codex, Gemini, etc.). Triggers include “deploy hermes”, “hermes on hetzner”, “hermes setup”, “install hermes agent”, “hermes camofox vnc”." />
+  <title>hermes-provision</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {  background-color: #f8f8f8; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ef2929; } /* Alert */
+    code span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #204a87; } /* Attribute */
+    code span.bn { color: #0000cf; } /* BaseN */
+    code span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4e9a06; } /* Char */
+    code span.cn { color: #8f5902; } /* Constant */
+    code span.co { color: #8f5902; font-style: italic; } /* Comment */
+    code span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+    code span.dt { color: #204a87; } /* DataType */
+    code span.dv { color: #0000cf; } /* DecVal */
+    code span.er { color: #a40000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #0000cf; } /* Float */
+    code span.fu { color: #204a87; font-weight: bold; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+    code span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+    code span.ot { color: #8f5902; } /* Other */
+    code span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
+    code span.sc { color: #ce5c00; font-weight: bold; } /* SpecialChar */
+    code span.ss { color: #4e9a06; } /* SpecialString */
+    code span.st { color: #4e9a06; } /* String */
+    code span.va { color: #000000; } /* Variable */
+    code span.vs { color: #4e9a06; } /* VerbatimString */
+    code span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">hermes-provision</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#hermes-agent-hetzner-deploy"
+id="toc-hermes-agent-hetzner-deploy">Hermes Agent Hetzner Deploy</a>
+<ul>
+<li><a href="#safety-rules" id="toc-safety-rules">Safety Rules</a></li>
+<li><a href="#prerequisites"
+id="toc-prerequisites">Prerequisites</a></li>
+<li><a href="#workflow" id="toc-workflow">Workflow</a>
+<ul>
+<li><a href="#step-1-server-selection-creation"
+id="toc-step-1-server-selection-creation">Step 1: Server Selection /
+Creation</a></li>
+<li><a href="#step-2-server-diagnostics"
+id="toc-step-2-server-diagnostics">Step 2: Server Diagnostics</a></li>
+<li><a href="#step-3-onlyterp-bootstrap"
+id="toc-step-3-onlyterp-bootstrap">Step 3: OnlyTerp Bootstrap</a></li>
+<li><a href="#step-4-hermes-install-official-path"
+id="toc-step-4-hermes-install-official-path">Step 4: Hermes Install
+(official path)</a></li>
+<li><a href="#step-5-replace-broken-systemd-unit"
+id="toc-step-5-replace-broken-systemd-unit">Step 5: Replace Broken
+systemd Unit</a></li>
+<li><a href="#step-6-configure-.env-discord-camofox-placeholders"
+id="toc-step-6-configure-.env-discord-camofox-placeholders">Step 6:
+Configure .env (Discord + Camofox placeholders)</a></li>
+<li><a href="#step-7-provider-auth-oauth-chatgpt-subscription"
+id="toc-step-7-provider-auth-oauth-chatgpt-subscription">Step 7:
+Provider Auth (OAuth — ChatGPT subscription)</a></li>
+<li><a href="#step-8-install-docker-for-camofox"
+id="toc-step-8-install-docker-for-camofox">Step 8: Install Docker (for
+Camofox)</a></li>
+<li><a href="#step-9-build-camofox-image-with-vnc-patch"
+id="toc-step-9-build-camofox-image-with-vnc-patch">Step 9: Build Camofox
+Image (with VNC patch)</a></li>
+<li><a href="#step-10-run-camofox-container"
+id="toc-step-10-run-camofox-container">Step 10: Run Camofox
+Container</a></li>
+<li><a href="#step-11-configure-discord-gateway"
+id="toc-step-11-configure-discord-gateway">Step 11: Configure Discord
+Gateway</a></li>
+<li><a href="#step-12-start-hermes-gateway-and-sanity-check"
+id="toc-step-12-start-hermes-gateway-and-sanity-check">Step 12: Start
+hermes-gateway and Sanity Check</a></li>
+<li><a href="#step-13-prevent-systemuser-systemd-conflict-critical"
+id="toc-step-13-prevent-systemuser-systemd-conflict-critical">Step 13:
+Prevent system/user systemd Conflict (Critical)</a></li>
+<li><a href="#step-14-report" id="toc-step-14-report">Step 14:
+Report</a></li>
+</ul></li>
+<li><a href="#update-workflow" id="toc-update-workflow">Update
+Workflow</a>
+<ul>
+<li><a href="#update-hermes" id="toc-update-hermes">Update
+Hermes</a></li>
+<li><a href="#update-camofox" id="toc-update-camofox">Update
+Camofox</a></li>
+</ul></li>
+<li><a href="#troubleshooting"
+id="toc-troubleshooting">Troubleshooting</a></li>
+<li><a href="#provider-reference-oauth-no-key-options"
+id="toc-provider-reference-oauth-no-key-options">Provider Reference
+(OAuth no-key options)</a></li>
+<li><a href="#reference" id="toc-reference">Reference</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="hermes-agent-hetzner-deploy">Hermes Agent Hetzner Deploy</h1>
+<p>Provision and deploy a Hermes Agent instance on a Hetzner Cloud (or
+any Ubuntu) VPS, with optional Camofox-VNC browser stack and Discord
+integration.</p>
+<h2 id="safety-rules">Safety Rules</h2>
+<ul>
+<li><strong>NEVER execute delete commands.</strong>
+<code>hcloud server delete</code>, <code>rm -rf</code>,
+<code>docker rm</code>, <code>systemctl disable --now</code> on other
+services are forbidden without explicit user approval.</li>
+<li><strong>NEVER expose or log API tokens, OAuth secrets, Discord bot
+tokens.</strong></li>
+<li><strong>ALWAYS ask for confirmation</strong> before create/modify
+operations on a live server. Present the command and wait for
+approval.</li>
+<li><strong>ALWAYS suggest a snapshot</strong> before changes on an
+existing Hetzner box:</li>
+</ul>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">hcloud</span> server create-image <span class="op">&lt;</span>server<span class="op">&gt;</span> --type snapshot <span class="at">--description</span> <span class="st">&quot;Backup before Hermes install&quot;</span></span></code></pre></div>
+<ul>
+<li><strong>WARN before running bootstrap on a server with other
+services</strong> — bootstrap resets UFW and may collide with existing
+reverse proxies on 80/443. Verify in Step 3.</li>
+</ul>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Ubuntu 22.04 / 24.04 fresh box (Debian 12 also works) with root or
+sudo</li>
+<li>SSH connectivity from the local machine</li>
+<li>Outbound 443 reachable (GitHub, OpenAI, Discord, Anthropic, Camoufox
+releases)</li>
+<li>RAM ≥ 4 GB recommended (Hermes ~150 MB + Camofox idle ~120 MB +
+browser active overhead)</li>
+<li>For new server creation only: <code>hcloud</code> CLI configured
+(see <code>clawpod-provision</code> skill Step 0)</li>
+</ul>
+<h2 id="workflow">Workflow</h2>
+<h3 id="step-1-server-selection-creation">Step 1: Server Selection /
+Creation</h3>
+<p>Branch:</p>
+<ul>
+<li><strong>A: Existing server</strong> → ask for
+<code>&lt;ip&gt;</code> and SSH key path, then Step 2</li>
+<li><strong>B: New Hetzner server</strong> → defer to
+<code>clawpod-provision</code> Step 2 to create a
+<code>cpx22 ubuntu-24.04 nbg1</code> box, then continue here</li>
+</ul>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">hcloud</span> server list</span></code></pre></div>
+<h3 id="step-2-server-diagnostics">Step 2: Server Diagnostics</h3>
+<p>Before any change, inspect the box. <strong>This is critical</strong>
+— bootstrap resets UFW and installs Caddy; conflicts with existing
+services must be surfaced first.</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> <span class="at">-o</span> StrictHostKeyChecking=no root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;</span><span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== OS ===&#39; &amp;&amp; cat /etc/os-release | head -3 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== Memory ===&#39; &amp;&amp; free -h | head -2 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== Disk ===&#39; &amp;&amp; df -h / | tail -1 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== Listening ports (public) ===&#39; &amp;&amp; ss -tlnp 2&gt;/dev/null | awk &#39;</span><span class="dt">\$</span><span class="st">4 ~ /^0</span><span class="dt">\\</span><span class="st">.0</span><span class="dt">\\</span><span class="st">.0</span><span class="dt">\\</span><span class="st">.0|^</span><span class="dt">\\</span><span class="st">[::</span><span class="dt">\\</span><span class="st">]/&#39; &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== UFW ===&#39; &amp;&amp; (ufw status 2&gt;/dev/null || echo &#39;ufw not active&#39;) &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== Existing services ===&#39; &amp;&amp; systemctl is-active caddy nginx docker hermes hermes-gateway clawpod 2&gt;/dev/null &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="st">  echo &#39;=== Node ===&#39; &amp;&amp; (node --version 2&gt;/dev/null || echo &#39;not installed&#39;)&quot;</span></span></code></pre></div>
+<p>Report findings to the user. Pay attention to:</p>
+<ul>
+<li><strong>Other services on 80/443</strong> → bootstrap’s Caddy
+install will conflict</li>
+<li><strong>Existing UFW rules beyond 22</strong> → bootstrap will reset
+and only allow 22/80/443</li>
+<li><strong>Existing <code>hermes</code> user</strong> → may be from
+prior install</li>
+<li><strong>RAM &lt; 4 GB</strong> → flag risk</li>
+</ul>
+<p>Pause and get explicit user approval before proceeding.</p>
+<h3 id="step-3-onlyterp-bootstrap">Step 3: OnlyTerp Bootstrap</h3>
+<p>Bootstrap installs system packages, creates the <code>hermes</code>
+user, locks down with UFW + fail2ban, and tries to install Hermes (which
+is expected to fail — handled in Step 4).</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;curl -sSL https://raw.githubusercontent.com/OnlyTerp/hermes-optimization-guide/main/scripts/vps-bootstrap.sh </span><span class="dt">\</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="st">    -o /tmp/vps-bootstrap.sh &amp;&amp; bash /tmp/vps-bootstrap.sh&quot;</span></span></code></pre></div>
+<p>Timeout: 600s.</p>
+<p>What bootstrap does:</p>
+<ul>
+<li>apt:
+<code>curl ca-certificates gnupg jq git python3-venv age rclone ufw fail2ban unattended-upgrades</code>
++ Node.js 20 + Caddy</li>
+<li>Creates user <code>hermes</code> (password disabled)</li>
+<li>Writes
+<code>/home/hermes/.hermes/{config.yaml,.env,skills,logs,lightrag}</code>
+and <code>/etc/caddy/Caddyfile.hermes.reference</code></li>
+<li>Installs systemd units <code>hermes.service</code>,
+<code>hermes-dashboard.service</code> (broken — replaced in Step 5)</li>
+<li>Resets UFW, allows 22/80/443 only</li>
+<li>Enables fail2ban and unattended-upgrades</li>
+</ul>
+<blockquote>
+<p><strong>Important</strong>: The bootstrap’s “Installing Hermes” step
+always fails with <code>curl: (35) ... tlsv1 unrecognized name</code>
+because the upstream <code>install.hermes.nous.ai</code> host returns
+SNI errors. Continue to Step 4.</p>
+</blockquote>
+<h3 id="step-4-hermes-install-official-path">Step 4: Hermes Install
+(official path)</h3>
+<p>Use the canonical Nous Research installer as the <code>hermes</code>
+user, from <code>hermes</code>’s home (uv needs write access):</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&#39;sudo -u hermes -i bash -c &quot;cd ~ &amp;&amp; curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash&quot;&#39;</span></span></code></pre></div>
+<p>Timeout: 600s.</p>
+<p>The installer: - Installs <code>uv</code> package manager - Installs
+Python 3.11 via uv - Installs Hermes binary at
+<code>~/.local/bin/hermes</code> - Lays out
+<code>~/.hermes/hermes-agent/</code> (project code) and links bundled
+skills</p>
+<p>Verify:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;sudo -u hermes -i hermes --version&quot;</span></span></code></pre></div>
+<h3 id="step-5-replace-broken-systemd-unit">Step 5: Replace Broken
+systemd Unit</h3>
+<p>OnlyTerp’s <code>hermes.service</code> calls <code>hermes run</code>
+(a non-existent subcommand in 0.12+). Remove it and install the official
+<code>hermes-gateway.service</code>:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;systemctl stop hermes hermes-dashboard 2&gt;/dev/null; </span><span class="dt">\</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="st">  systemctl disable hermes hermes-dashboard 2&gt;/dev/null; </span><span class="dt">\</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="st">  rm -f /etc/systemd/system/hermes.service /etc/systemd/system/hermes-dashboard.service; </span><span class="dt">\</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="st">  systemctl daemon-reload; </span><span class="dt">\</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="st">  ln -sf /home/hermes/.local/bin/hermes /usr/local/bin/hermes; </span><span class="dt">\</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="st">  hermes gateway install --system --run-as-user hermes --force&quot;</span></span></code></pre></div>
+<p>Verify the unit was generated:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;systemctl cat hermes-gateway.service | head -20&quot;</span></span></code></pre></div>
+<h3 id="step-6-configure-.env-discord-camofox-placeholders">Step 6:
+Configure .env (Discord + Camofox placeholders)</h3>
+<p>Append Discord and Camofox env vars to the <code>.env</code> that
+bootstrap created. Existing keys (Anthropic/Google/Telegram from
+bootstrap) are preserved.</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;sudo -u hermes tee -a /home/hermes/.hermes/.env &gt; /dev/null &lt;&lt;&#39;EOF&#39;</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="st"># Discord (fill in before starting hermes-gateway)</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="st">DISCORD_BOT_TOKEN=</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="st">DISCORD_ALLOWED_USERS=</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="st">DISCORD_FREE_RESPONSE_CHANNELS=</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="st"># Camofox (set after the container is running)</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="st">CAMOFOX_URL=http://127.0.0.1:9377</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="st">EOF&quot;</span></span></code></pre></div>
+<blockquote>
+<p><strong>Important</strong>: Never paste real tokens into this skill’s
+commands. Ask the user to add them via
+<code>sudo -u hermes -i nano /home/hermes/.hermes/.env</code> in a later
+interactive step, or via the Hermes setup wizard.</p>
+</blockquote>
+<h3 id="step-7-provider-auth-oauth-chatgpt-subscription">Step 7:
+Provider Auth (OAuth — ChatGPT subscription)</h3>
+<p>Hermes supports OAuth providers that do <strong>not</strong> require
+a paid API key:</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Subscription</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>openai-codex</code></td>
+<td>ChatGPT Plus / Pro</td>
+</tr>
+<tr>
+<td><code>gemini</code> (oauth_enabled)</td>
+<td>Google account (free tier)</td>
+</tr>
+<tr>
+<td><code>qwen-oauth</code></td>
+<td>Qwen Portal</td>
+</tr>
+<tr>
+<td><code>copilot</code></td>
+<td>GitHub Copilot</td>
+</tr>
+</tbody>
+</table>
+<p>The setup wizard is interactive (device flow OAuth). The user must
+run it themselves in their SSH terminal:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (User runs this from their own terminal)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> <span class="at">-u</span> hermes <span class="at">-i</span> hermes setup model</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="co"># → choose openai-codex (or gemini / qwen-oauth / copilot)</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># → open the printed URL in a local browser and approve</span></span></code></pre></div>
+<p>Verify auth completion:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;sudo -u hermes -i hermes auth status openai-codex&quot;</span></span></code></pre></div>
+<p>Expect <code>openai-codex: logged in</code>.</p>
+<h3 id="step-8-install-docker-for-camofox">Step 8: Install Docker (for
+Camofox)</h3>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;curl -fsSL https://get.docker.com | sh &amp;&amp; docker --version &amp;&amp; systemctl is-active docker&quot;</span></span></code></pre></div>
+<p>Timeout: 300s.</p>
+<h3 id="step-9-build-camofox-image-with-vnc-patch">Step 9: Build Camofox
+Image (with VNC patch)</h3>
+<p><code>jo-inc/camofox-browser</code> has no public Docker image.
+Source-build it. The upstream Dockerfile does NOT install the VNC
+plugin’s apt deps — patch it.</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;apt-get install -y make git &gt;/dev/null 2&gt;&amp;1 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="st">  cd /opt &amp;&amp; git clone https://github.com/jo-inc/camofox-browser.git &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="st">  cd camofox-browser &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="st">  sed -i &#39;/python3-minimal </span><span class="dt">\\\\\$</span><span class="st">/i</span><span class="dt">\\</span><span class="st">    # VNC stack (x11vnc + noVNC + websockify) for browser remote access</span><span class="dt">\\</span><span class="st">n    x11vnc </span><span class="dt">\\\\\\</span><span class="st">n    novnc </span><span class="dt">\\\\\\</span><span class="st">n    python3-websockify </span><span class="dt">\\\\\\</span><span class="st">n    procps </span><span class="dt">\\\\</span><span class="st">&#39; Dockerfile&quot;</span></span></code></pre></div>
+<p>Fetch upstream binaries (Camoufox zip ~680 MB + yt-dlp ~35 MB) and
+build the image:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;cd /opt/camofox-browser &amp;&amp; make fetch&quot;</span></span></code></pre></div>
+<p>Timeout: 600s.</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;cd /opt/camofox-browser &amp;&amp; make build&quot;</span></span></code></pre></div>
+<p>Timeout: 900s.</p>
+<p>Verify the image:</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;docker images | grep camofox-browser&quot;</span></span></code></pre></div>
+<h3 id="step-10-run-camofox-container">Step 10: Run Camofox
+Container</h3>
+<p>Bind every port to <strong>127.0.0.1</strong>. External access is via
+SSH tunnel only.</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;IMG=</span><span class="dt">\$</span><span class="st">(docker images --format &#39;{{.Repository}}:{{.Tag}}&#39; | grep &#39;^camofox-browser:&#39; | head -1) &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="st">  docker run -d --restart unless-stopped --name camofox-browser </span><span class="dt">\</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a><span class="st">    -p 127.0.0.1:9377:9377 </span><span class="dt">\</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a><span class="st">    -p 127.0.0.1:6080:6080 </span><span class="dt">\</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a><span class="st">    -p 127.0.0.1:5900:5900 </span><span class="dt">\</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="st">    -e ENABLE_VNC=1 </span><span class="dt">\</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="st">    -e VNC_BIND=0.0.0.0 </span><span class="dt">\</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a><span class="st">    -e VNC_RESOLUTION=1920x1080 </span><span class="dt">\</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="st">    -e MAX_OLD_SPACE_SIZE=1024 </span><span class="dt">\</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="st">    -v /home/hermes/.camofox-data:/root/.camofox </span><span class="dt">\</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a><span class="st">    </span><span class="dt">\$</span><span class="st">IMG&quot;</span></span></code></pre></div>
+<p>Smoke test:</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;sleep 5 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="st">  curl -s http://127.0.0.1:9377/health &amp;&amp; echo &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="st">  curl -s -o /dev/null -w &#39;noVNC HTTP %{http_code}</span><span class="dt">\\</span><span class="st">n&#39; http://127.0.0.1:6080/vnc.html&quot;</span></span></code></pre></div>
+<p>Expect Camofox health <code>ok:true, browserConnected:true</code> and
+noVNC HTTP 200.</p>
+<h3 id="step-11-configure-discord-gateway">Step 11: Configure Discord
+Gateway</h3>
+<p>The user must create a Discord application + bot first:</p>
+<ol type="1">
+<li>https://discord.com/developers/applications → New Application → Bot
+→ Reset Token (copy the long token)</li>
+<li>Enable <strong>Privileged Gateway Intents</strong>: Message Content
+Intent, Server Members Intent</li>
+<li>OAuth2 → URL Generator → scopes <code>bot</code> +
+<code>applications.commands</code>, Bot Permissions
+<code>Send Messages / Read Message History / Use Slash Commands</code>.
+Open the URL to invite the bot to a server.</li>
+<li>Capture their own Discord user ID (Discord app → Settings → Advanced
+→ Developer Mode → right-click avatar → Copy User ID).</li>
+</ol>
+<p>User runs the gateway setup interactively:</p>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># (User runs this from their own terminal)</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> <span class="at">-u</span> hermes <span class="at">-i</span> hermes setup gateway</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="co"># → choose `discord` (space to select, Enter)</span></span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="co"># → paste bot token</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="co"># → paste allowed user IDs</span></span></code></pre></div>
+<h3 id="step-12-start-hermes-gateway-and-sanity-check">Step 12: Start
+hermes-gateway and Sanity Check</h3>
+<div class="sourceCode" id="cb20"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;systemctl restart hermes-gateway &amp;&amp; sleep 6 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="st">  systemctl status hermes-gateway --no-pager | head -10 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="st">  journalctl -u hermes-gateway -n 20 --no-pager&quot;</span></span></code></pre></div>
+<p>Expect <code>Active: active (running)</code> and the only WARNING
+line about Opus codec (irrelevant for text bots).</p>
+<h3 id="step-13-prevent-systemuser-systemd-conflict-critical">Step 13:
+Prevent system/user systemd Conflict (Critical)</h3>
+<p>After <code>hermes setup gateway</code> runs as <code>hermes</code>
+user with <code>Linger=yes</code>, a <strong>duplicate
+user-level</strong> <code>hermes-gateway.service</code> can spawn. Both
+then fight via <code>gateway run --replace</code>, producing Discord
+replies like
+<code>Gateway shutting down — Your current task will be interrupted.</code>
+on every message.</p>
+<p>Disable lingering and kill any duplicate process:</p>
+<div class="sourceCode" id="cb21"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;loginctl disable-linger hermes &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="st">  pkill -u hermes -f &#39;hermes_cli.main gateway&#39; 2&gt;/dev/null; </span><span class="dt">\</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="st">  systemctl restart hermes-gateway &amp;&amp; sleep 5 &amp;&amp; </span><span class="dt">\</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="st">  echo === processes === &amp;&amp; ps -ef | grep &#39;hermes_cli.main gateway&#39; | grep -v grep&quot;</span></span></code></pre></div>
+<p>Verify exactly <strong>one</strong> gateway process. If
+<code>hermes gateway status --system</code> warns
+<code>Both user and system gateway services are installed</code>, run
+the above again.</p>
+<h3 id="step-14-report">Step 14: Report</h3>
+<p>Present to the user:</p>
+<ol type="1">
+<li>Server info (IP, RAM, disk free)</li>
+<li>Hermes version + active provider
+(e.g. <code>openai-codex: logged in</code>)</li>
+<li>Service status: <code>hermes-gateway</code> active,
+<code>camofox-browser</code> Docker container Up</li>
+<li>UFW rules</li>
+<li>Next steps:</li>
+</ol>
+<pre><code>Discord:
+  Bot is online if /home/hermes/.hermes/.env has DISCORD_BOT_TOKEN set.
+  DM the bot or @-mention it in a channel.
+
+VNC (Camofox browser view) — from your local machine:
+  ssh -N -L 6080:127.0.0.1:6080 root@&lt;ip&gt;
+  Then open http://127.0.0.1:6080/vnc.html
+
+Camofox API:
+  ssh -N -L 9377:127.0.0.1:9377 root@&lt;ip&gt;
+  curl http://127.0.0.1:9377/health
+
+Useful commands on the server:
+  systemctl status hermes-gateway
+  journalctl -u hermes-gateway -f
+  docker logs -f camofox-browser
+  sudo -u hermes -i hermes auth status &lt;provider&gt;
+  sudo -u hermes -i hermes update            # update Hermes
+  cd /opt/camofox-browser &amp;&amp; make reset      # rebuild Camofox</code></pre>
+<h2 id="update-workflow">Update Workflow</h2>
+<h3 id="update-hermes">Update Hermes</h3>
+<div class="sourceCode" id="cb23"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;sudo -u hermes -i hermes update &amp;&amp; systemctl restart hermes-gateway&quot;</span></span></code></pre></div>
+<h3 id="update-camofox">Update Camofox</h3>
+<div class="sourceCode" id="cb24"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> root@<span class="op">&lt;</span>ip<span class="op">&gt;</span> <span class="st">&quot;cd /opt/camofox-browser &amp;&amp; git pull &amp;&amp; make reset&quot;</span></span></code></pre></div>
+<p><code>make reset</code> stops + removes the container, deletes the
+image, then rebuilds. After rebuild, re-run the Step 10
+<code>docker run</code> command (since <code>make reset</code> does not
+relaunch with our env flags).</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 39%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Root Cause</th>
+<th>Solution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bootstrap exits with <code>tlsv1 unrecognized name</code> on
+“Installing Hermes”</td>
+<td>Upstream <code>install.hermes.nous.ai</code> SNI broken</td>
+<td>Expected. Continue to Step 4 (official installer).</td>
+</tr>
+<tr>
+<td><code>hermes</code> command not found in systemd unit</td>
+<td>OnlyTerp unit hardcodes <code>/usr/local/bin/hermes</code>,
+installer puts it in <code>~/.local/bin/</code></td>
+<td>Step 5 creates the symlink.</td>
+</tr>
+<tr>
+<td><code>hermes: error: argument command: invalid choice: 'run'</code></td>
+<td>OnlyTerp unit calls obsolete <code>hermes run</code></td>
+<td>Step 5 replaces unit with
+<code>hermes gateway install --system</code>.</td>
+</tr>
+<tr>
+<td>Discord replies <code>Gateway shutting down</code> on every
+message</td>
+<td>Both system + user <code>hermes-gateway</code> instances active,
+fighting via <code>--replace</code></td>
+<td>Step 13: <code>loginctl disable-linger hermes</code> + kill
+duplicate.</td>
+</tr>
+<tr>
+<td>Camofox container starts but VNC unreachable</td>
+<td>Upstream Dockerfile missing
+<code>x11vnc / novnc / websockify</code></td>
+<td>Step 9 patches Dockerfile before build.</td>
+</tr>
+<tr>
+<td><code>hermes setup model</code> says “no terminal available”</td>
+<td>Run inside SSH multiplexed / non-TTY session</td>
+<td>User must run interactively from their own terminal.</td>
+</tr>
+<tr>
+<td><code>hermes auth status openai-codex</code> shows
+<code>not logged in</code></td>
+<td>OAuth device flow not completed</td>
+<td>Re-run <code>hermes setup model</code> and approve in browser.</td>
+</tr>
+<tr>
+<td>RAM exhausted during Camofox build</td>
+<td>LTO + Camoufox unzip on 2 GB box</td>
+<td>Use <code>cpx22</code> (4 GB) or larger; do not run on
+<code>cpx11</code>.</td>
+</tr>
+<tr>
+<td>Caddy fails to bind 80</td>
+<td>Existing reverse proxy on the box</td>
+<td>Skip Caddy use, or stop the other proxy first. The bootstrap
+installs Caddy but does not start an active reverse-proxy unless you
+place a real <code>Caddyfile</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="provider-reference-oauth-no-key-options">Provider Reference
+(OAuth no-key options)</h2>
+<p>Hermes plugin paths under
+<code>~/.hermes/hermes-agent/plugins/model-providers/</code>:</p>
+<ul>
+<li><code>openai-codex/</code> →
+<code>base_url=https://chatgpt.com/backend-api/codex</code>,
+<code>auth_type=oauth_external</code>, <code>env_vars=()</code>. Uses
+the ChatGPT subscription via Codex CLI device flow.</li>
+<li><code>gemini/</code> → set
+<code>providers.google.oauth_enabled: true</code> in
+<code>config.yaml</code>. Uses Google account free tier.</li>
+<li><code>qwen-oauth/</code> → Qwen Portal OAuth.</li>
+<li><code>copilot/</code> → GitHub Copilot OAuth.</li>
+</ul>
+<p>For paid API providers (Anthropic, OpenAI raw API), set the
+corresponding <code>*_API_KEY</code> in <code>~/.hermes/.env</code>
+instead of using a wizard.</p>
+<h2 id="reference">Reference</h2>
+<ul>
+<li>OnlyTerp bootstrap:
+https://github.com/OnlyTerp/hermes-optimization-guide</li>
+<li>Hermes docs: https://hermes-agent.nousresearch.com/docs/</li>
+<li>Camofox upstream: https://github.com/jo-inc/camofox-browser</li>
+<li>Companion runbook (this repo):
+<code>docs/20260507_hermes_hetzner_deployment_runbook.md</code></li>
+</ul>
+</body>
+</html>
